@@ -51,10 +51,10 @@ class GitHubCommitChecker:
 
     def get_todays_commits(self):
         headers = {'Authorization': f'token {self.github_token}'}
-        today = datetime.now().strftime('%Y-%m-%d')
+        local_today = datetime.now().astimezone().date()
+        print(f"Local Today's Date: {local_today}")
         
         print(f"GitHub Username: {self.github_username}")
-        print(f"Today's date: {today}")
         print(f"GitHub Token first 10 chars: {self.github_token[:10] if self.github_token else 'Not found'}")
         
         try:
@@ -70,13 +70,16 @@ class GitHubCommitChecker:
                 
             events = response.json()
             print(f"Total events received: {len(events)}")
+            print(f"Events data: {events[:2]}")  # 最初の2つだけ表示
             
             commit_count = 0
             for event in events:
-                event_date = event['created_at'].split('T')[0]  # YYYY-MM-DD形式で取得
-                print(f"Event type: {event['type']}, Date: {event_date}")
+                # UTCからローカルタイムゾーンに変換
+                event_datetime = datetime.fromisoformat(event['created_at'].replace('Z', '+00:00')).astimezone()
+                event_date = event_datetime.date()
+                print(f"Event type: {event['type']}, Event Local Date: {event_date}, Local Today's Date: {local_today}")
                 
-                if event['type'] == 'PushEvent' and event_date == today:
+                if event['type'] == 'PushEvent' and event_date == local_today:
                     commit_count += event['payload']['size']
                     print(f"Found {event['payload']['size']} commits in this push event")
             
