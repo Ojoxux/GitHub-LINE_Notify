@@ -17,6 +17,7 @@ from linebot.v3.messaging import (
     PushMessageRequest
 )
 from linebot.v3.exceptions import InvalidSignatureError
+from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
@@ -95,23 +96,25 @@ class GitHubCommitChecker:
             print(f"Response data: {response.text[:200]}")  # 最初の200文字だけ表示
             return None
 
-    def check_and_notify(self, user_id):
+    def check_and_notify(self, user_id, notify_immediately=False):
         commit_count = self.get_todays_commits()
         app.logger.info(f"Today's commit count: {commit_count}")
         if commit_count is not None:
             if commit_count < 5:
-                message = (
-                    f'今日のコミット数: {commit_count}\n'
-                    f'目標まであと{5-commit_count}コミット必要です！\n'
-                    f'頑張りましょう！'
-                )
+                if notify_immediately:
+                    message = (
+                        f'今日のコミット数: {commit_count}\n'
+                        f'目標まであと{5-commit_count}コミット必要です！\n'
+                        f'頑張りましょう！'
+                    )
+                    self.send_message(user_id, message)
             else:
                 message = (
                     f'おめでとうございます！\n'
                     f'今日のコミット数: {commit_count}\n'
                     f'目標を達成しました！'
                 )
-            self.send_message(user_id, message)
+                self.send_message(user_id, message)
 
     def send_message(self, user_id, message):
         try:
@@ -123,6 +126,7 @@ class GitHubCommitChecker:
             app.logger.info(f"Message sent to {user_id}: {message}")
         except Exception as e:
             app.logger.error(f"Failed to send message: {str(e)}")
+
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -138,16 +142,33 @@ def callback():
 
     return 'OK'
 
+user_ids = set()
+
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    app.logger.info(f"Received message: {event.message.text} from user: {event.source.user_id}")
+    user_id = event.source.user_id
+    app.logger.info(f"Received message: {event.message.text} from user: {user_id}")
     
+    # ユーザIDをセットに追加
+    user_ids.add(user_id)
+
     if event.message.text == "コミット確認":
         checker = GitHubCommitChecker()
-        checker.check_and_notify(event.source.user_id)
+        checker.check_and_notify(user_id, notify_immediately=True)
     else:
         app.logger.info("条件に一致しないメッセージを受信しました")
+        
+def notify_nightly():
+    checker = GitHubCommitChecker()
+    for user_id in user_ids:
+        checker.check_and_notify(user_id, notify_immediately=True)
 
 if __name__ == "__main__":
+    # スケジューラーの設定
+    scheduler = BackgroundScheduler()
+    # 毎日21時に通知を送信
+    scheduler.add_job(notify_nightly, 'cron', hour=21, minute=0)
+    scheduler.start()
+
     port = int(os.getenv("PORT", 5001))
     app.run(host="0.0.0.0", port=port)
