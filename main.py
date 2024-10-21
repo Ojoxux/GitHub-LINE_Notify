@@ -1,6 +1,7 @@
 import os
 import requests
 import logging
+import pytz
 from datetime import datetime
 from dotenv import load_dotenv
 from flask import Flask, request, abort
@@ -53,7 +54,8 @@ class GitHubCommitChecker:
 
     def get_todays_commits(self):
         headers = {'Authorization': f'token {self.github_token}'}
-        local_today = datetime.now().astimezone().date()
+        local_tz = pytz.timezone('Asia/Tokyo')
+        local_today = datetime.now(local_tz).date()
         print(f"ローカルの今日の日付: {local_today}")
         
         print(f"GitHubユーザー名: {self.github_username}")
