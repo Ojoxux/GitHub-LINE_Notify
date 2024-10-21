@@ -54,25 +54,25 @@ class GitHubCommitChecker:
     def get_todays_commits(self):
         headers = {'Authorization': f'token {self.github_token}'}
         local_today = datetime.now().astimezone().date()
-        print(f"Local Today's Date: {local_today}")
+        print(f"ローカルの今日の日付: {local_today}")
         
-        print(f"GitHub Username: {self.github_username}")
-        print(f"GitHub Token first 10 chars: {self.github_token[:10] if self.github_token else 'Not found'}")
+        print(f"GitHubユーザー名: {self.github_username}")
+        print(f"GitHubトークンの最初の10文字: {self.github_token[:10] if self.github_token else 'Not found'}")
         
         try:
             url = f'https://api.github.com/users/{self.github_username}/events'
             print(f"Requesting URL: {url}")
             
             response = requests.get(url, headers=headers)
-            print(f"GitHub API Response Status: {response.status_code}")
+            print(f"GitHub APIのレスポンスステータス: {response.status_code}")
             
             if response.status_code != 200:
-                print(f"GitHub API Error Response: {response.text}")
+                print(f"GitHub APIエラーレスポンス: {response.text}")
                 return None
                 
             events = response.json()
-            print(f"Total events received: {len(events)}")
-            print(f"Events data: {events[:2]}")  # 最初の2つだけ表示
+            print(f"受信したイベントの総数: {len(events)}")
+            print(f"イベントデータ: {events[:2]}")  # 最初の2つだけ表示
             
             commit_count = 0
             for event in events:
@@ -85,7 +85,7 @@ class GitHubCommitChecker:
                     commit_count += event['payload']['size']
                     print(f"Found {event['payload']['size']} commits in this push event")
             
-            print(f"Final commit count for today: {commit_count}")
+            print(f"今日の最終コミット数: {commit_count}")
             return commit_count
                 
         except requests.exceptions.RequestException as e:
@@ -94,7 +94,7 @@ class GitHubCommitChecker:
             return None
         except KeyError as e:
             print(f"データ解析エラー: {str(e)}")
-            print(f"Response data: {response.text[:200]}")  # 最初の200文字だけ表示
+            print(f"レスポンスデータ: {response.text[:200]}")  # 最初の200文字だけ表示
             return None
 
     def check_and_notify(self, user_id, notify_immediately=False):
