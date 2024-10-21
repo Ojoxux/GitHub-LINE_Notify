@@ -21,17 +21,18 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
-# 環境変数のクリア
-os.environ.clear()
-
 # 環境変数の読み込み
-load_dotenv(override=True)
+if os.path.exists('.env'):
+    load_dotenv(override=True)
 
 app.logger.setLevel(logging.INFO)
 
 # 環境変数から設定を読み込む
-CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
-CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
+CHANNEL_ACCESS_TOKEN = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN')
+CHANNEL_SECRET = os.environ.get('LINE_CHANNEL_SECRET')
+
+if not CHANNEL_ACCESS_TOKEN or not CHANNEL_SECRET:
+    raise ValueError("LINE credentials are not properly set in environment variables")
 
 # 環境変数のデバッグ情報を出力
 print("Channel Access Token length:", len(CHANNEL_ACCESS_TOKEN) if CHANNEL_ACCESS_TOKEN else "Token not found")
@@ -157,7 +158,7 @@ def handle_message(event):
         checker.check_and_notify(user_id, notify_immediately=True)
     else:
         app.logger.info("条件に一致しないメッセージを受信しました")
-        
+
 def notify_nightly():
     checker = GitHubCommitChecker()
     for user_id in user_ids:
