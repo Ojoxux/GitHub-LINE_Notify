@@ -79,7 +79,7 @@ class GitHubCommitChecker:
             commit_count = 0
             for event in events:
                 # UTCからローカルタイムゾーンに変換
-                event_datetime = datetime.fromisoformat(event['created_at'].replace('Z', '+00:00')).astimezone()
+                event_datetime = datetime.fromisoformat(event['created_at'].replace('Z', '+00:00')).astimezone(local_tz)
                 event_date = event_datetime.date()
                 print(f"Event type: {event['type']}, Event Local Date: {event_date}, Local Today's Date: {local_today}")
                 
