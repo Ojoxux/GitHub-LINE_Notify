@@ -160,6 +160,9 @@ def handle_message(event):
         checker.check_and_notify(user_id, notify_immediately=True)
     else:
         app.logger.info("条件に一致しないメッセージを受信しました")
+        # 条件に一致しないメッセージを受信した場合の通知
+        checker = GitHubCommitChecker()
+        checker.send_message(user_id, "申し訳ありませんが、そのメッセージは認識できません。'コミット確認'と入力してください。")
 
 def notify_nightly():
     checker = GitHubCommitChecker()
