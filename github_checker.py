@@ -1,15 +1,8 @@
 import os
 import requests
-import logging
 import pytz
 from datetime import datetime
-from dotenv import load_dotenv
-from flask import Flask, request, abort
-from linebot.v3.webhooks import (
-    MessageEvent,
-    TextMessageContent
-)
-from linebot.v3.webhook import WebhookHandler
+from flask import current_app as app
 from linebot.v3.messaging import (
     Configuration,
     ApiClient,
@@ -17,39 +10,12 @@ from linebot.v3.messaging import (
     TextMessage,
     PushMessageRequest
 )
-from linebot.v3.exceptions import InvalidSignatureError
-from apscheduler.schedulers.background import BackgroundScheduler
-
-app = Flask(__name__)
-
-# 環境変数の読み込み
-if os.path.exists('.env'):
-    load_dotenv(override=True)
-
-app.logger.setLevel(logging.INFO)
-
-# 環境変数から設定を読み込む
-CHANNEL_ACCESS_TOKEN = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN')
-CHANNEL_SECRET = os.environ.get('LINE_CHANNEL_SECRET')
-
-if not CHANNEL_ACCESS_TOKEN or not CHANNEL_SECRET:
-    raise ValueError("LINE credentials are not properly set in environment variables")
-
-# 環境変数のデバッグ情報を出力
-print("Channel Access Token length:", len(CHANNEL_ACCESS_TOKEN) if CHANNEL_ACCESS_TOKEN else "Token not found")
-print("First 10 chars of token:", CHANNEL_ACCESS_TOKEN[:10] if CHANNEL_ACCESS_TOKEN else "Token not found")
-
-app.logger.info("LINE_CHANNEL_ACCESS_TOKEN: %s", CHANNEL_ACCESS_TOKEN)
-app.logger.info("LINE_CHANNEL_SECRET: %s", CHANNEL_SECRET)
-
-configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
-handler = WebhookHandler(CHANNEL_SECRET)
 
 class GitHubCommitChecker:
     def __init__(self):
         self.github_token = os.getenv('GITHUB_TOKEN')
         self.github_username = os.getenv('GITHUB_USERNAME')
-        self.api_client = ApiClient(configuration)
+        self.api_client = ApiClient(Configuration(access_token=os.getenv('LINE_CHANNEL_ACCESS_TOKEN')))
         self.messaging_api = MessagingApi(self.api_client)
 
     def get_todays_commits(self):
@@ -129,52 +95,3 @@ class GitHubCommitChecker:
             app.logger.info(f"Message sent to {user_id}: {message}")
         except Exception as e:
             app.logger.error(f"Failed to send message: {str(e)}")
-
-
-@app.route("/callback", methods=['POST'])
-def callback():
-    signature = request.headers['X-Line-Signature']
-    body = request.get_data(as_text=True)
-    app.logger.info("Request body: " + body)
-
-    try:
-        handler.handle(body, signature)
-    except InvalidSignatureError:
-        app.logger.error("Invalid signature. Please check your channel access token/channel secret.")
-        abort(400)
-
-    return 'OK'
-
-user_ids = set()
-
-@handler.add(MessageEvent, message=TextMessageContent)
-def handle_message(event):
-    user_id = event.source.user_id
-    app.logger.info(f"Received message: {event.message.text} from user: {user_id}")
-    
-    # ユーザIDをセットに追加
-    user_ids.add(user_id)
-
-    if event.message.text == "コミット確認":
-        checker = GitHubCommitChecker()
-        checker.check_and_notify(user_id, notify_immediately=True)
-    else:
-        app.logger.info("条件に一致しないメッセージを受信しました")
-        # 条件に一致しないメッセージを受信した場合の通知
-        checker = GitHubCommitChecker()
-        checker.send_message(user_id, "申し訳ありませんが、そのメッセージは認識できません。'コミット確認'と入力してください。")
-
-def notify_nightly():
-    checker = GitHubCommitChecker()
-    for user_id in user_ids:
-        checker.check_and_notify(user_id, notify_immediately=True)
-
-if __name__ == "__main__":
-    # スケジューラーの設定
-    scheduler = BackgroundScheduler()
-    # 毎日21時に通知を送信
-    scheduler.add_job(notify_nightly, 'cron', hour=21, minute=0)
-    scheduler.start()
-
-    port = int(os.getenv("PORT", 5001))
-    app.run(host="0.0.0.0", port=port)
