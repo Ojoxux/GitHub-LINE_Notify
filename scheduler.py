@@ -1,6 +1,9 @@
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.jobstores.base import JobLookupError
+from apscheduler.triggers.cron import CronTrigger
 from github_checker import GitHubCommitChecker
 from line_bot import user_ids
+import pytz
 
 def notify_nightly():
     checker = GitHubCommitChecker()
@@ -9,5 +12,8 @@ def notify_nightly():
 
 def start_scheduler():
     scheduler = BackgroundScheduler()
-    scheduler.add_job(notify_nightly, 'cron', hour=21, minute=0)
+    # 東京時間（JST）で午後9時に通知を送信
+    tokyo_tz = pytz.timezone('Asia/Tokyo')
+    trigger = CronTrigger(hour=21, minute=0, timezone=tokyo_tz)
+    scheduler.add_job(notify_nightly, trigger)
     scheduler.start()
